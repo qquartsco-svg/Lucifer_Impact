@@ -25,7 +25,8 @@ from .detection import (MOIDResult, moid_from_comet,
                         BPlaneResult, bplane_from_encounter,
                         RiskAssessment, monte_carlo_impact,
                         torino_scale, palermo_scale)
-from .effects   import (ImpactParams, ImpactResult, estimate_impact,
+from .effects   import (run_effects,
+                        ImpactParams, ImpactResult, estimate_impact,
                         CraterParams, CraterResult, compute_crater,
                         TsunamiParams, TsunamiResult, compute_tsunami)
 from .io        import CometRecord, get_comet, BUILTIN_COMETS
@@ -45,7 +46,8 @@ __all__ = [
     "BPlaneResult", "bplane_from_encounter",
     "RiskAssessment", "monte_carlo_impact",
     "torino_scale", "palermo_scale",
-    # Effects
+    # Effects (단독 파이프라인)
+    "run_effects",
     "ImpactParams", "ImpactResult", "estimate_impact",
     "CraterParams", "CraterResult", "compute_crater",
     "TsunamiParams", "TsunamiResult", "compute_tsunami",

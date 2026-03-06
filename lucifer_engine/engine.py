@@ -24,7 +24,8 @@ from .detection  import (moid_from_comet, compute_moid, EARTH_ELEMENTS,
                           bplane_from_encounter,
                           monte_carlo_impact, bplane_probability,
                           OrbitalUncertainty, RiskAssessment)
-from .effects    import (ImpactParams, estimate_impact, ImpactResult,
+from .effects    import (run_effects,
+                          ImpactParams, estimate_impact, ImpactResult,
                           CraterParams, compute_crater,
                           TsunamiParams, compute_tsunami)
 from .io         import CometRecord, get_comet, BUILTIN_COMETS
@@ -372,29 +373,22 @@ class LuciferEngine:
                         is_ocean: bool = False,
                         water_depth_km: float = 4.0,
                         coast_dist_km: float = 1000.0):
-        """충돌 에너지 + 크레이터 + 쓰나미 전체 계산."""
+        """충돌 에너지 + 크레이터 + 쓰나미 전체 계산.
+
+        내부적으로 run_effects() 사용 — effects 레이어 단독 진입점.
+        """
         D   = self.record.diameter_km
         rho = self.record.rho_gcm3
-
-        ip = ImpactParams(D_km=D, rho_gcm3=rho, v_kms=v_kms,
-                          theta_deg=theta_deg,
-                          composition=("ice" if rho < 1.0 else "rock"))
-        ir = estimate_impact(ip)
-
-        cp = CraterParams(D_km=D, rho_i=rho * 1e3, v_kms=v_kms,
-                          theta_deg=theta_deg,
-                          target_type="ocean" if is_ocean else "rock",
-                          water_depth_km=water_depth_km)
-        cr = compute_crater(cp)
-
-        ts = None
-        if is_ocean:
-            tp = TsunamiParams(E_eff_MT=ir.E_eff_MT, D_impactor_km=D,
-                               water_depth_km=water_depth_km,
-                               target_coast_km=coast_dist_km)
-            ts = compute_tsunami(tp)
-
-        return ir, cr, ts
+        return run_effects(
+            D_km=D,
+            rho_gcm3=rho,
+            v_kms=v_kms,
+            theta_deg=theta_deg,
+            composition="ice" if rho < 1.0 else "rock",
+            is_ocean=is_ocean,
+            water_depth_km=water_depth_km,
+            coast_dist_km=coast_dist_km,
+        )
 
     # ── 전체 파이프라인 ────────────────────────────────────────────────────
 
