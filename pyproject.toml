@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "lucifer-engine"
+version = "1.0.0"
+description = "완전 독립형 혜성 궤도·충돌 탐색 시스템 — LuciferEngine"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "CookiieBrain", email = "" },
+]
+keywords = [
+    "comet", "asteroid", "orbital-mechanics", "impact", "torino-scale",
+    "astrodynamics", "N-body", "MOID", "planetary-defense",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Astronomy",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+]
+
+[project.optional-dependencies]
+network = ["requests>=2.28"]   # JPL SBDB 실시간 API
+plot    = ["matplotlib>=3.6"]  # 궤도 시각화
+all     = ["requests>=2.28", "matplotlib>=3.6"]
+
+[project.scripts]
+lucifer-analyze = "lucifer_engine.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["lucifer_engine*"]
