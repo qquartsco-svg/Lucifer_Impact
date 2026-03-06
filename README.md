@@ -77,22 +77,32 @@ lucifer-analyze --comet Lucifer --ocean --years 5 --v 25 --theta 45 --json
 |---------|------|------|
 | `a` | **AU** | 반장축 (타원: a > 0, 쌍곡선: a = q/(e-1)) |
 | `e` | 무차원 | 이심률 (타원: 0 ≤ e < 1, 쌍곡선: e > 1) |
-| `i` | **rad** | 궤도경사각 (내부 저장), 입력 API는 deg → rad 자동 변환 |
-| `raan` | **rad** | 승교점 적경 Ω |
-| `argp` | **rad** | 근점인수 ω |
-| `M0` | **rad** | `epoch_jd` 기준 평균근점각 M |
+| `i` | **rad** | 궤도경사각 (내부 저장) |
+| `raan` | **rad** | 승교점 적경 Ω (내부 저장) |
+| `argp` | **rad** | 근점인수 ω (내부 저장) |
+| `M0` | **rad** | `epoch_jd` 기준 평균근점각 M (내부 저장) |
 | `epoch_jd` | **JD (TDB)** | default = 2451545.0 (J2000.0) |
 
-**좌표계:** ICRF / 적도 관성계 (equatorial J2000)  
-**시간 척도:** TDB (Barycentric Dynamical Time)  
-**태양 GM:** `k² = 0.01720209895² AU³/day²` (Gauss 상수, IAU 1976)  
-**질량:** 태양 = 1 M☉ (행성 섭동은 절대 GM 사용, `PLANET_GM` 딕셔너리)
+**① 기준계:** 태양 중심 (heliocentric), 좌표 원점 = 태양 질량 중심  
+**② 각도 단위 계약:** `OrbitalElements` 내부는 전부 **radian**.  
+`from_elements()` API는 `i_deg`, `raan_deg`, `argp_deg`, `M0_deg`로 **degree 입력 → 내부에서 rad 자동 변환**.  
+`OrbitalElements`를 직접 생성할 때는 반드시 radian 입력.  
+**③ 좌표계:** ICRF / 적도 관성계 (equatorial J2000)  
+**④ 시간 척도:** TDB (Barycentric Dynamical Time)  
+**⑤ 태양 GM:** `k² = 0.01720209895² AU³/day²` (Gauss 상수, IAU 1976)  
+**⑥ 질량:** 태양 = 1 M☉ (행성 섭동은 절대 GM 사용, `PLANET_GM` 딕셔너리)
 
 ```python
 # 리포트에서 확인
 report.orbit.frame      # → "ICRF/equatorial-J2000"
 report.orbit.time_scale # → "TDB (Barycentric Dynamical Time)"
 report.orbit.gm_sun     # → "0.01720209895² AU³/day² (Gauss k²)"
+
+# API 사용 예: degree 입력 (내부에서 rad 변환)
+engine = LuciferEngine.from_elements(
+    "2029 XB1", a=2.5, e=0.75,
+    i_deg=15.0, raan_deg=42.0, argp_deg=130.0, M0_deg=0.0,
+)
 ```
 
 ---
@@ -149,8 +159,11 @@ report.detection.moid_method
 # → "grid-180×180 + L-BFGS-B  ※다중 최솟값 주의: 멀티스타트 미적용"
 ```
 
-**PHA 기준:** MOID < 0.05 AU  
-**지구 반지름:** 6.371e3 km = 4.258e-5 AU
+**③ PHA (Potentially Hazardous) 판정 계약:**  
+소행성 기준: H < 22 mag **AND** MOID < 0.05 AU (IAU Working Group 정의).  
+혜성은 절대 등급 기준이 불안정하므로 본 엔진은 **MOID < 0.05 AU** 조건만 사용.  
+`report.detection.pha_threshold_au = 0.05` (변경 불가, 계약값).  
+**지구 반지름:** 6.371×10³ km = 4.258×10⁻⁵ AU (충돌 판정 기준선)
 
 ### B-plane 기하
 
@@ -169,6 +182,7 @@ report.detection.moid_method
 |------|---|
 | 샘플링 방식 | 6요소 가우시안 섭동 (대각 공분산, 상관 없음) |
 | 기본 σ | a: 1e-5 AU, e: 1e-6, i/Ω/ω: 1e-5~1e-6 rad, M0: 1e-4 rad |
+| σ 의미 | 궤도 결정 정보가 없을 때 쓰는 **보수적 기본값** (실제 오차와 무관할 수 있음). 실측 궤도 공분산이 있으면 `OrbitalUncertainty.cov6x6` 직접 입력 권장. |
 | 충돌 판정 | 각 샘플의 MOID < R⊕ (지구 반지름) |
 | 시드 | 명시적 `mc_seed` 파라미터 (기본 42), report.config에 기록 |
 
@@ -221,6 +235,12 @@ E_total = ½mv²        m = ρ · (4/3)π(D/2)³
 E_eff   = E_total · sin²θ   (수직 성분만 지면에 전달)
 ```
 
+**⑤ 대기권 감속·파편화 미적용 고지:**  
+`v_kms`는 **대기권 진입 전 속도가 아닌 지표 충돌 속도로 가정**한다.  
+실제로 소형 천체(D ≲ 0.3 km)는 대기권 통과 중 대부분 소멸하므로 E_eff가 과대 추정된다.  
+대기권 진입·파편화 모델(Chyba 1993)은 로드맵 4순위로 예정.  
+D > 1 km 천체에서는 대기권 손실 < 10%이므로 현재 모델이 실용적으로 유효하다.
+
 **환경 델타 입력 계약:**
 
 | 파라미터 | 기본값 | 설명 |
@@ -248,6 +268,11 @@ Holsapple & Housen (2007) Pi-group 스케일링.
 ### 쓰나미 모델 (`effects/tsunami.py`)
 
 Ward & Asphaug (2000) 에너지 스케일링 + 원형 파 감쇠.
+
+**⑥ 쓰나미 r₀ 정의:**  
+`r₀ = D_impactor / 2` [m] — 충돌체 반지름을 초기 파 생성 반경으로 사용.  
+초기 파고: `H₀ = 0.021 · (E / ρ_w·g·r₀³)^(1/3) · r₀`  
+전파 감쇠: `H(r) = H₀ · (r₀ / r)^1`  (2D 원형 파, 분산 미적용)
 
 **필수 입력 계약:**
 
@@ -294,7 +319,55 @@ report2 = engine.full_analysis(**{
 
 ---
 
-## 7. CookiieBrain 연결 — 정확한 폴백 계약
+## 7. Lucifer Impact → Effects 플로우 구조
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  LuciferEngine  full_analysis()  파이프라인                  │
+│                                                             │
+│  [io/]           혜성 레코드 로드                            │
+│   CometRecord ──────────────────────────────────────────┐  │
+│                                                          │  │
+│  [orbit/]        궤도 전파                               ↓  │
+│   OrbitalElements → kepler / nbody → (t, r, v) array    │  │
+│                                          │               │  │
+│  [detection/]    충돌 탐지               ↓               │  │
+│   moid.py  ─── MOID < 0.05 AU?          │               │  │
+│   bplane.py ── |B| < r_cap?             │               │  │
+│   probability.py ← Monte Carlo (seed)   │               │  │
+│         │                               │               │  │
+│         ↓                               ↓               │  │
+│   RiskAssessment                  (전파 궤도)            │  │
+│   (p_impact, Torino, Palermo)           │               │  │
+│         │                               │               │  │
+│  [effects/]      충돌 영향 ←────────────┘               │  │
+│   energy.py  → ImpactResult (E_eff_MT, ΔT, ΔSL, ΔP)   │  │
+│   crater.py  → CraterResult (D_final, depth, regime)   │  │
+│   tsunami.py → TsunamiResult (H0, H_coast, run_up)     │  │
+│         │                                               │  │
+│         └───────────────────────────────────────────────┘  │
+│                         ↓                                   │
+│                   FullReport                                │
+│           (orbit + detection + probability +                │
+│            impact + crater + tsunami + config)              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**플로우 검증: 구조가 맞다.**
+
+| 단계 | 입력 | 출력 | 독립성 |
+|------|------|------|--------|
+| `io` → `orbit` | `CometRecord.elements` | 상태벡터 배열 | 독립 실행 가능 |
+| `orbit` → `detection` | `OrbitalElements` (MOID는 전파 불필요) | `RiskAssessment` | 독립 실행 가능 |
+| `detection` → `effects` | 에너지 계산만 필요, 확률과 독립 | `ImpactResult/Crater/Tsunami` | **독립 실행 가능** |
+| `effects` → `FullReport` | 모든 서브 결과 집약 | JSON-직렬화 가능 계약 | — |
+
+핵심: **detection과 effects는 서로 독립적**이다. MOID/확률 없이 에너지만 계산 가능.  
+이것이 CookiieBrain에서 `impact_only` 폴백이 성립하는 이유.
+
+---
+
+## 8. CookiieBrain 연결 — 정확한 폴백 계약  
 
 ```
 CookiieBrain/
@@ -335,7 +408,78 @@ LuciferEngine.effects.energy.E_eff_MT
 
 ---
 
-## 8. 물리 모델 근거
+## 9. 서사적 의미 — LuciferEngine이 CookiieBrain에서 하는 일
+
+LuciferEngine은 CookiieBrain `L0_solar` 서사의 6번째이자 마지막 장 `_06_lucifer_impact`를 물리적으로 구동한다.
+
+```
+L0_solar 서사 흐름:
+  _01_beginnings         태초의 상태 초기화
+  _02_creation_days      창조 6일 — 행성계 형성
+  _03_eden_os_underworld 에덴 / 내부 역학
+  _04_firmament_era      궁창 레이어 안정화
+  _05_noah_flood         임계점 접근 (FirmamentLayer instability)
+  _06_lucifer_impact  ←  LuciferEngine이 여기에 연결됨
+       │
+       └── E_eff_MT → Noah.compute_effective_instability() → impulse_shock
+           → FirmamentLayer 붕괴 임계(0.85) 초과 여부를 수치로 결정
+```
+
+**서사와 물리의 분리 원칙:**  
+LuciferEngine은 "루시퍼가 충돌했다"는 결론을 내리지 않는다.  
+오직 **주어진 궤도요소에서 E_eff_MT와 확률을 계산해 넘겨줄 뿐**이다.  
+에너지가 충분히 크면 Noah 레이어가 임계를 넘어 홍수 서사로 분기되고,  
+에너지가 작으면 FirmamentLayer가 버텨 다른 서사가 전개된다.  
+서사는 물리 결과의 함수다 — 하드코딩 없음.
+
+---
+
+## 10. 확장성 및 활용 가능성
+
+### 독립 모듈로서의 확장
+
+LuciferEngine은 CookiieBrain 없이도 독립적으로 동작한다. 가능한 확장:
+
+| 활용 분야 | 방법 | 추가 필요 |
+|----------|------|----------|
+| **행성 방어 시뮬레이터** | MOID + Torino Scale 실시간 계산 | JPL SBDB 실시간 API |
+| **교육용 충돌 시뮬레이터** | CLI `lucifer-analyze` 직접 사용 | — (현재 완성) |
+| **게임/인터랙티브 서사 엔진** | `full_analysis()` → JSON → 이벤트 트리거 | 프론트엔드 연결 |
+| **기후 모델 입력** | `delta_pole_eq_K`, `delta_H2O_canopy` 추출 | 기후 모델 커넥터 |
+| **소행성 채굴 선택** | 궤도 전파 + MOID로 접근 가능 소행성 필터링 | `io/sbdb.py` API 연동 |
+| **다중 천체 스윕** | `LuciferEngine.from_elements()` 루프 | — (현재 완성) |
+
+### CookiieBrain 레이어 확장 포인트
+
+```python
+# 어떤 레이어든 LuciferEngine 결과를 구독할 수 있다
+report = engine.full_analysis(...)
+
+# L3_memory: 충격 이벤트를 MemoryWell로 기록
+memory.record_event("lucifer_impact", report.to_dict())
+
+# L4_analysis: 충격파 에너지를 통계역학 레이어로 분석
+from L4_analysis.Layer_1 import analyze_transition
+analyze_transition(impulse=report.impact.E_eff_MT)
+
+# L1_dynamics: N-체 전파 결과를 Phase_B 다중 우물 퍼텐셜에 주입
+from L1_dynamics.Phase_B import MultiWellPotential
+pot.inject_perturbation(report.orbit.a_au, report.impact.E_eff_MT)
+```
+
+### 상용화 경로
+
+```
+현재 상태  → pip install lucifer-engine (로컬)
+1단계      → PyPI 배포 + JPL 실시간 API
+2단계      → REST API 서버 (FastAPI) + Swagger 문서
+3단계      → 웹 대시보드 (궤도 시각화 + 위험 등급 실시간 표시)
+4단계      → 행성 방어 기관 데이터 파이프라인 연동 (ESA NEO, NASA CNEOS)
+```
+
+---
+
+## 12. 물리 모델 근거
 
 | 모듈 | 방정식 | 기반 문헌 |
 |------|--------|----------|
@@ -350,7 +494,7 @@ LuciferEngine.effects.energy.E_eff_MT
 
 ---
 
-## 9. 설치
+## 13. 설치
 
 ```bash
 cd ENGINE_HUB/00_PLANET_LAYER/Lucifer_Engine
@@ -361,7 +505,7 @@ pip install -e ".[all]"         # 전체 (network + matplotlib)
 
 ---
 
-## 10. 로드맵
+## 14. 로드맵
 
 | 우선순위 | 항목 | 이유 |
 |---------|------|------|
