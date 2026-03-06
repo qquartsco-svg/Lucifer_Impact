@@ -30,11 +30,14 @@ from .effects   import (ImpactParams, ImpactResult, estimate_impact,
                         TsunamiParams, TsunamiResult, compute_tsunami)
 from .io        import CometRecord, get_comet, BUILTIN_COMETS
 
-from .engine import LuciferEngine, FullReport
+from .engine import (LuciferEngine, FullReport,
+                     ReportOrbit, ReportDetection,
+                     ReportProbability, ReportConfig)
 
 __all__ = [
     # Core engine
     "LuciferEngine", "FullReport",
+    "ReportOrbit", "ReportDetection", "ReportProbability", "ReportConfig",
     # Orbit
     "OrbitalElements", "propagate_kepler", "propagate_nbody", "PropagatorConfig",
     # Detection
